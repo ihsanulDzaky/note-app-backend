@@ -1,7 +1,12 @@
 import response from '../utils/response.js'
-import { ClientError } from '../exceptions/index.js'
+import ClientError from '../exceptions/client-error.js'
 
 const ErrorHandler = (err, req, res, next) => {
+
+    console.log('err instanceof ClientError:', err instanceof ClientError);
+    console.log('err.constructor.name:', err.constructor.name);
+    console.log('err.statusCode:', err.statusCode);
+    
     if (err instanceof ClientError) {
         return response(res, err.statusCode, err.message, null)
     }

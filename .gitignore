@@ -1,2 +1,4 @@
 node_modules
 note-app-backend.pem
+.env
+.prod.env
