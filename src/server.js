@@ -1,8 +1,17 @@
-import server from './server/index.js';
-
-const host = process.env.NODE_ENV !== 'production' ? 'localhost' : '0.0.0.0'
+import express from 'express';
+import routes from './routes/index.js';
+import cors from 'cors';
+ 
+const app = express();
 const port = process.env.PORT || 3000;
-
-server.listen(port, () => {
-    console.log(`server running at http://${host}:${port}`)
-})
+const host = process.env.NODE_ENV !== 'production' ? 'localhost' : '0.0.0.0';
+ 
+app.use(express.json());
+app.use(cors({
+  origin: '*'
+}));
+app.use('/', routes);
+ 
+app.listen(port, () => {
+  console.log(`Server running at http://${host}:${port}`);
+});
