@@ -21,12 +21,12 @@ export const createUser = async (req, res, next) => {
     return next(new InvariantError('User gagal ditambahkan'));
   }
 
-  return response(res, 201, 'User berhasil ditambahkan', user);
+  return response(res, 201, 'User berhasil ditambahkan', {userId: user.id});
 };
 
 export const getUsers = async (req, res) => {
   const users = await UserRepositories.getUsers();
-  return response(res, 200, 'Users berhasil ditampilkan', users);
+  return response(res, 200, 'Users berhasil ditampilkan', {users});
 };
 
 export const getUserById = async (req, res, next) => {
@@ -37,18 +37,23 @@ export const getUserById = async (req, res, next) => {
     return next(new NotFoundError('User tidak ditemukan'));
   }
 
-  return response(res, 200, 'User berhasil ditampilkan', user);
+  return response(res, 200, 'User berhasil ditampilkan', {
+  user: {
+    id: user.id,
+    username: user.username,
+    fullname: user.fullname,
+  },
+});
 };
 
 export const getUserByUsername = async (req, res, next) => {
   const username = req.query.username;
-  const user = await UserRepositories.getUserByUsername(username);
 
-  if (!user) {
-    return next(new NotFoundError('User tidak ditemukan'));
-  }
+  const users = await UserRepositories.getUserByUsername(username);
 
-  return response(res, 200, 'User berhasil ditampilkan', user);
+  return response(res, 200, 'User berhasil ditampilkan', {
+    users,
+  });
 };
 
 export const editUser = async (req, res, next) => {

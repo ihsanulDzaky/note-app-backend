@@ -22,26 +22,51 @@ class NoteRepositories {
   }
 
   async getNotes(owner) {
-    const query = {
-      text: 'SELECT * FROM notes WHERE owner = $1',
-      values: [owner],
-    };
+  const query = {
+    text: `
+      SELECT DISTINCT
+        notes.id,
+        notes.title,
+        notes.body,
+        notes.tags,
+        users.username
+      FROM notes
+      LEFT JOIN users
+        ON users.id = notes.owner
+      LEFT JOIN collaborations
+        ON collaborations.note_id = notes.id
+      WHERE notes.owner = $1
+        OR collaborations.user_id = $1
+    `,
+    values: [owner],
+  };
 
-    const result = await this.pool.query(query);
+  const result = await this.pool.query(query);
 
-    return result.rows;
-  }
+  return result.rows;
+}
 
-  async getNoteById(id) {
-    const query = {
-      text: 'SELECT * FROM notes WHERE id = $1',
-      values: [id],
-    };
+async getNoteById(id) {
+  const query = {
+    text: `
+      SELECT 
+        notes.id,
+        notes.title,
+        notes.body,
+        notes.tags,
+        users.username
+      FROM notes
+      LEFT JOIN users
+      ON users.id = notes.owner
+      WHERE notes.id = $1
+    `,
+    values: [id],
+  };
 
-    const result = await this.pool.query(query);
+  const result = await this.pool.query(query);
 
-    return result.rows[0];
-  }
+  return result.rows[0];
+}
 
   async editNote({ id, title, body, tags }) {
     const updatedAt = new Date().toISOString();
@@ -86,6 +111,27 @@ class NoteRepositories {
 
     return result.rows[0];
   }
+
+  async verifyNoteAccess(noteId, userId) {
+  const ownerResult = await this.verifyNoteOwner(noteId, userId);
+
+  if (ownerResult) {
+    return ownerResult;
+  }
+
+  const query = {
+    text: 'SELECT * FROM collaborations WHERE note_id = $1 AND user_id = $2',
+    values: [noteId, userId],
+  };
+
+  const result = await this.pool.query(query);
+
+  if (result.rows.length) {
+    return result.rows[0];
+  }
+
+  return false;
+}
 }
 
 export default new NoteRepositories();
