@@ -1,9 +1,11 @@
 import { Pool } from 'pg';
 import { nanoid } from 'nanoid';
+import CacheService from '../../../cache/redis-service.js';
 
 class NoteRepositories {
   constructor() {
     this.pool = new Pool();
+    this.cacheService = new CacheService();
   }
 
   async createNote({ title, body, tags, owner }) {
@@ -17,13 +19,16 @@ class NoteRepositories {
     };
 
     const result = await this.pool.query(query);
+    await this.cacheService.delete(`notes:${owner}`);
 
     return result.rows[0];
   }
 
   async getNotes(owner) {
-  const query = {
-    text: `
+    const cacheKey = `notes:${owner}`
+
+    const query = {
+      text: `
       SELECT DISTINCT
         notes.id,
         notes.title,
@@ -38,17 +43,19 @@ class NoteRepositories {
       WHERE notes.owner = $1
         OR collaborations.user_id = $1
     `,
-    values: [owner],
-  };
+      values: [owner],
+    };
 
-  const result = await this.pool.query(query);
+    const result = await this.pool.query(query);
 
-  return result.rows;
-}
+    await this.cacheService.set(cacheKey, JSON.stringify(result.rows));
 
-async getNoteById(id) {
-  const query = {
-    text: `
+    return result.rows;
+  }
+
+  async getNoteById(id) {
+    const query = {
+      text: `
       SELECT 
         notes.id,
         notes.title,
@@ -60,13 +67,13 @@ async getNoteById(id) {
       ON users.id = notes.owner
       WHERE notes.id = $1
     `,
-    values: [id],
-  };
+      values: [id],
+    };
 
-  const result = await this.pool.query(query);
+    const result = await this.pool.query(query);
 
-  return result.rows[0];
-}
+    return result.rows[0];
+  }
 
   async editNote({ id, title, body, tags }) {
     const updatedAt = new Date().toISOString();
@@ -78,6 +85,11 @@ async getNoteById(id) {
 
     const result = await this.pool.query(query);
 
+    const owner = result.rows[0].owner;
+    if (result.rows[0]) {
+      await this.cacheService.delete(`notes:${owner}`);
+    }
+
     return result.rows[0];
   }
 
@@ -88,6 +100,13 @@ async getNoteById(id) {
     };
 
     const result = await this.pool.query(query);
+
+    const owner = result.rows[0].owner;
+
+    if (result.rows[0]) {
+      await this.cacheService.delete(`notes:${owner}`);
+    }
+
     return result.rows[0].id;
   }
 
@@ -113,25 +132,25 @@ async getNoteById(id) {
   }
 
   async verifyNoteAccess(noteId, userId) {
-  const ownerResult = await this.verifyNoteOwner(noteId, userId);
+    const ownerResult = await this.verifyNoteOwner(noteId, userId);
 
-  if (ownerResult) {
-    return ownerResult;
+    if (ownerResult) {
+      return ownerResult;
+    }
+
+    const query = {
+      text: 'SELECT * FROM collaborations WHERE note_id = $1 AND user_id = $2',
+      values: [noteId, userId],
+    };
+
+    const result = await this.pool.query(query);
+
+    if (result.rows.length) {
+      return result.rows[0];
+    }
+
+    return false;
   }
-
-  const query = {
-    text: 'SELECT * FROM collaborations WHERE note_id = $1 AND user_id = $2',
-    values: [noteId, userId],
-  };
-
-  const result = await this.pool.query(query);
-
-  if (result.rows.length) {
-    return result.rows[0];
-  }
-
-  return false;
-}
 }
 
 export default new NoteRepositories();
